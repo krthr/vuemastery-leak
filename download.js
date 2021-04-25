@@ -17,9 +17,13 @@ async function downloadVideos(videos = [], course) {
 
   for (const videoInfo of videos) {
     pool.queue(async (downloader) => {
-      log.info("downloading video: ", videoInfo.title, videoInfo.vimeoUrl);
-      await downloader.downloadVideo(videoInfo, videosPath);
-      log.info(videoInfo.title, "was downloaded! 🤘🏻");
+      try {
+        log.info("downloading video: ", videoInfo.title, videoInfo.vimeoUrl);
+        await downloader.downloadVideo(videoInfo, videosPath);
+        log.info(videoInfo.title, "was downloaded! 🤘🏻");
+      } catch (error) {
+        log.error(error);
+      }
     });
   }
 

@@ -1,6 +1,9 @@
 require("dotenv").config();
 const { expose } = require("threads/worker");
 const { spawn } = require("child_process");
+const { Logger } = require("tslog");
+
+const log = new Logger();
 
 const { YOUTUBE_DL_BIN } = process.env;
 
@@ -13,12 +16,14 @@ async function downloadVideo({ vimeoUrl, title }, path) {
     prc.stdout.setEncoding("utf-8");
     prc.stderr.setEncoding("utf-8");
 
+    let error = "";
+
     prc.stdout.on("data", (data) => {
-      log.debug(data.trim());
+      // log.debug(data.trim());
     });
 
     prc.stderr.on("data", (err) => {
-      log.error(err);
+      error += err;
     });
 
     prc.on("error", reject);
@@ -26,7 +31,7 @@ async function downloadVideo({ vimeoUrl, title }, path) {
       if (code === 0) {
         resolve();
       } else {
-        reject();
+        reject(error);
       }
     });
   });

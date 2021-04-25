@@ -27,6 +27,8 @@ const SELECTOR = {
  * @returns {Promise<{title: string, vimeoUrl: string, index: number}>}
  */
 async function getVideoInfo(page, index) {
+  await page.waitForSelector("iframe");
+
   const videoInfo = await page.evaluate(() => {
     const title = document
       .querySelector(".list-item.active")
@@ -58,7 +60,7 @@ async function handleVideoPage(page, index) {
 
 async function main() {
   const browser = await puppeteer.launch({
-    headless: false,
+    headless: true,
   });
 
   const page = await browser.newPage();

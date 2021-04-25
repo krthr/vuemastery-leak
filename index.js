@@ -5,11 +5,11 @@ const { Logger } = require("tslog");
 const fs = require("fs");
 const { downloadVideo } = require("./download");
 
-const { EMAIL, PASSWORD, COURSE_NAME, COURSE_URL } = process.env;
+const { EMAIL, PASSWORD, COURSE_NAME, COURSE_URL, HEADLESS } = process.env;
 
 const log = new Logger();
 
-fs.mkdirSync(__dirname + "/" + COURSE_NAME + "/screenshots", {
+fs.mkdirSync(__dirname + "/" + COURSE_NAME, {
   recursive: true,
 });
 
@@ -27,10 +27,6 @@ const SELECTOR = {
  * @returns {Promise<{title: string, vimeoUrl: string, index: number}>}
  */
 async function getVideoInfo(page, index) {
-  await page.screenshot({
-    path: `${COURSE_NAME}/screenshots/${index}-page.png`,
-  });
-
   const videoInfo = await page.evaluate(() => {
     const title = document
       .querySelector(".list-item.active")
@@ -127,7 +123,10 @@ async function main() {
 
   for (const info of videoInfo) {
     await downloadVideo(info.vimeoUrl, info.index);
+    log.info(info.title, "was downloaded! 🤘🏻");
   }
+
+  log.info("cooorrecto sr edwin! ✅✨");
 }
 
 main();

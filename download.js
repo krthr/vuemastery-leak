@@ -1,50 +1,26 @@
-const { spawn } = require("child_process");
+const { spawn, Thread, Worker } = require("threads");
 const { Logger } = require("tslog");
+
 const log = new Logger();
 
-const { COURSE_NAME, YOUTUBE_DL_BIN } = process.env;
+async function downloadVideos(videos = [], course) {
+  const downloader = await spawn(new Worker("/worker/downloader.js"));
 
-async function downloadVideo(url, title, index) {
-  const videoFolderPath = `./${COURSE_NAME}/${title}.%(ext)s`;
-
-  return new Promise((resolve, reject) => {
-    const prc = spawn(YOUTUBE_DL_BIN, ["-o", videoFolderPath, url]);
-
-    prc.stdout.setEncoding("utf-8");
-    prc.stderr.setEncoding("utf-8");
-
-    prc.stdout.on("data", (data) => {
-      log.debug(data.trim());
-    });
-
-    prc.stderr.on("data", (err) => {
-      log.error(err);
-    });
-
-    prc.on("error", reject);
-    prc.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject();
-      }
-    });
-  });
-}
-
-async function downloadVideos(videos = []) {
   log.info("start downloading videos");
+  const videosPath = `./${course.name}`;
 
-  for (const info of videos) {
-    log.info("downloading video: ", info.title);
-    await downloadVideo(info.vimeoUrl, info.title, info.index);
-    log.info(info.title, "was downloaded! 🤘🏻");
-  }
+  const promises = videos.map(async (videoInfo) => {
+    log.info("downloading video: ", videoInfo.title, videoInfo.vimeoUrl);
+    await downloader.downloadVideo(videoInfo, videosPath);
+    log.info(videoInfo.title, "was downloaded! 🤘🏻");
+  });
 
+  await Promise.all(promises);
+
+  await Thread.terminate(downloader);
   log.info("cooorrecto sr edwin! ✅✨");
 }
 
 module.exports = {
   downloadVideos,
-  downloadVideo,
 };

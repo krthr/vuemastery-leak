@@ -5,15 +5,9 @@ const { Logger } = require("tslog");
 const fs = require("fs");
 const { downloadVideos } = require("./download");
 
-const { EMAIL, PASSWORD, COURSE_NAME, COURSE_URL } = process.env;
+const { EMAIL, PASSWORD } = process.env;
 
 const log = new Logger();
-
-fs.mkdirSync(__dirname + "/" + COURSE_NAME, {
-  recursive: true,
-});
-
-const JSON_VIDEOS_FILE_PATH = `${COURSE_NAME}/videosInfo.json`;
 
 const SELECTOR = {
   openLoginModalBtn:
@@ -26,9 +20,9 @@ const SELECTOR = {
 /**
  *
  * @param {puppeteer.Page} page
- * @returns {Promise<{title: string, vimeoUrl: string, index: number}>}
+ * @returns {Promise<{title: string, vimeoUrl: string}>}
  */
-async function getVideoInfo(page, index) {
+async function getVideoInfo(page) {
   await page.waitForSelector("iframe");
 
   const videoInfo = await page.evaluate(() => {
@@ -37,40 +31,92 @@ async function getVideoInfo(page, index) {
       .querySelector(".list-item-title").textContent;
 
     const vimeoUrl = document.querySelector("iframe").src;
+    const url = window.location.href;
 
     return {
       title,
       vimeoUrl,
+      url,
     };
   });
 
-  return { index, ...videoInfo };
+  return videoInfo;
 }
 
 /**
  *
  * @param {puppeteer.Page} page
  */
-async function handleVideoPage(page, index) {
-  await page.waitForSelector(".lessons-list-scroll");
-  const info = await getVideoInfo(page, index);
+async function handleVideoPage(page) {
+  await page.reload({
+    waitUntil: "domcontentloaded",
+  });
 
-  log.info(`got info of video #${index} => `, info.title);
+  await page.waitForSelector(".lessons-list-scroll");
+
+  const info = await getVideoInfo(page);
+
+  log.info(`got info of video => `, info.title);
 
   return info;
 }
 
-async function main() {
-  const videosFileAlreadyExists = fs.existsSync(JSON_VIDEOS_FILE_PATH);
+async function handleCourse(page, course) {
+  log.info(`course ${course.name}`);
+
+  const courseVideosJsonPath = `${course.name}/videosInfo.json`;
+
+  const videosFileAlreadyExists = fs.existsSync(courseVideosJsonPath);
   if (videosFileAlreadyExists) {
     log.info("videos file already exists 😎");
-    const json = fs.readFileSync(JSON_VIDEOS_FILE_PATH);
+    const json = fs.readFileSync(courseVideosJsonPath);
     const videos = JSON.parse(json);
 
-    await downloadVideos(videos);
+    await downloadVideos(videos, course);
     return;
   }
 
+  fs.mkdirSync(__dirname + "/" + course.name, {
+    recursive: true,
+  });
+
+  log.info("opening course page name=", course.name);
+
+  await page.goto(course.url, { waitUntil: "domcontentloaded" });
+
+  const videos = [];
+
+  const updateJson = () => {
+    fs.writeFileSync(courseVideosJsonPath, JSON.stringify(videos, null, 2));
+  };
+
+  while (true) {
+    const info = await handleVideoPage(page);
+    videos.push(info);
+
+    updateJson();
+
+    const noMoreVideos = await page.$("button.next[disabled]");
+
+    if (noMoreVideos) {
+      break;
+    }
+
+    await page.click("button[rel=next]");
+    await page.waitForTimeout(3000);
+  }
+
+  log.info("done ✅");
+  log.info("total videos=", videos.length);
+
+  updateJson();
+
+  log.info("file saved ✅ path=", courseVideosJsonPath);
+
+  await downloadVideos(videos, course);
+}
+
+async function main() {
   const browser = await puppeteer.launch({
     headless: true,
   });
@@ -96,41 +142,16 @@ async function main() {
 
   await page.waitForTimeout(2000);
 
-  log.info("opening course page");
+  const coursesJson = fs.readFileSync("./courses.json");
+  const courses = JSON.parse(coursesJson);
 
-  await page.goto(COURSE_URL, { waitUntil: "domcontentloaded" });
-
-  const videos = [];
-  let index = 1;
-
-  while (true) {
-    const info = await handleVideoPage(page, index);
-    videos.push(info);
-
-    const noMoreVideos = await page.$("button.next[disabled]");
-
-    if (noMoreVideos) {
-      break;
-    }
-
-    await page.click("button[rel=next]");
-    await page.waitForTimeout(3000);
-
-    index++;
+  for (const course of courses) {
+    await handleCourse(page, course);
   }
 
   log.info("closing browser");
 
   await browser.close();
-
-  log.info("done ✅");
-  log.info("total videos=", videos.length);
-
-  fs.writeFileSync(JSON_VIDEOS_FILE_PATH, JSON.stringify(videos, null, 2));
-
-  log.info("file saved ✅ path=", `./${COURSE_NAME}/videosInfo.json`);
-
-  await downloadVideos(videos);
 }
 
 main();

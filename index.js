@@ -3,15 +3,17 @@ require("dotenv").config();
 const puppeteer = require("puppeteer");
 const { Logger } = require("tslog");
 const fs = require("fs");
-const { downloadVideo } = require("./download");
+const { downloadVideos } = require("./download");
 
-const { EMAIL, PASSWORD, COURSE_NAME, COURSE_URL, HEADLESS } = process.env;
+const { EMAIL, PASSWORD, COURSE_NAME, COURSE_URL } = process.env;
 
 const log = new Logger();
 
 fs.mkdirSync(__dirname + "/" + COURSE_NAME, {
   recursive: true,
 });
+
+const JSON_VIDEOS_FILE_PATH = `${COURSE_NAME}/videosInfo.json`;
 
 const SELECTOR = {
   openLoginModalBtn:
@@ -59,6 +61,16 @@ async function handleVideoPage(page, index) {
 }
 
 async function main() {
+  const videosFileAlreadyExists = fs.existsSync(JSON_VIDEOS_FILE_PATH);
+  if (videosFileAlreadyExists) {
+    log.info("videos file already exists 😎");
+    const json = fs.readFileSync(JSON_VIDEOS_FILE_PATH);
+    const videos = JSON.parse(json);
+
+    await downloadVideos(videos);
+    return;
+  }
+
   const browser = await puppeteer.launch({
     headless: true,
   });
@@ -88,12 +100,12 @@ async function main() {
 
   await page.goto(COURSE_URL, { waitUntil: "domcontentloaded" });
 
-  const videoInfo = [];
+  const videos = [];
   let index = 1;
 
   while (true) {
     const info = await handleVideoPage(page, index);
-    videoInfo.push(info);
+    videos.push(info);
 
     const noMoreVideos = await page.$("button.next[disabled]");
 
@@ -112,23 +124,13 @@ async function main() {
   await browser.close();
 
   log.info("done ✅");
-  log.info("total videos=", videoInfo.length);
+  log.info("total videos=", videos.length);
 
-  fs.writeFileSync(
-    `${COURSE_NAME}/videosInfo.json`,
-    JSON.stringify(videoInfo, null, 2)
-  );
+  fs.writeFileSync(JSON_VIDEOS_FILE_PATH, JSON.stringify(videos, null, 2));
 
   log.info("file saved ✅ path=", `./${COURSE_NAME}/videosInfo.json`);
 
-  log.info("start downloading videos");
-
-  for (const info of videoInfo) {
-    await downloadVideo(info.vimeoUrl, info.index);
-    log.info(info.title, "was downloaded! 🤘🏻");
-  }
-
-  log.info("cooorrecto sr edwin! ✅✨");
+  await downloadVideos(videos);
 }
 
 main();

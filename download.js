@@ -7,10 +7,8 @@ async function downloadVideos(videos = [], course) {
   const worker = new Worker("/worker/downloader.js");
   const pool = Pool(() => spawn(worker), {
     size: 1,
-    concurrency: 5,
+    concurrency: 6,
   });
-
-  const downloader = await spawn(worker);
 
   log.info("start downloading videos");
   const videosPath = `./${course.name}`;

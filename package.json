@@ -1,0 +1,19 @@
+{
+  "name": "vuemastery-leak",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chalk": "^4.1.1",
+    "dotenv": "^8.2.0",
+    "puppeteer": "^9.0.0",
+    "tslog": "^3.2.0",
+    "youtube-dl-exec": "^1.2.1"
+  }
+}
